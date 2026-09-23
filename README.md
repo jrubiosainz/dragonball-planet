@@ -6,7 +6,9 @@ Orbit the globe and zoom down to street level, or jump on the Flying Nimbus and 
 
 ## Run it
 
-Open `index.html` in a modern browser with WebGL 2. If your browser refuses to run it from disk, serve the folder instead:
+Play it online at **https://jrubiosainz.github.io/dragonball-planet/**.
+
+To run it locally, open `index.html` in a modern browser with WebGL 2. If your browser refuses to run it from disk, serve the folder instead:
 
 ```sh
 python3 -m http.server 8000   # then open http://localhost:8000
