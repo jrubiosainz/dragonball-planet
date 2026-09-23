@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Dragon Ball Planet · Three.js</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bangers&family=Comic+Neue:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink:#1a1226; --orange:#ff8a00; --yellow:#ffd21f; --blue:#1d5fd1; --paper:#fffdf3; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; height:100%; overflow:hidden; background:#05040f; font-family:'Comic Neue','Comic Sans MS',system-ui,sans-serif; color:var(--ink); user-select:none; -webkit-user-select:none; }
+  #gl { display:block; position:fixed; inset:0; width:100%; height:100%; outline:none; touch-action:none; cursor:grab; }
+  #gl.dragging { cursor:grabbing; }
+  #speed { position:fixed; inset:0; width:100%; height:100%; pointer-events:none; }
+  #halftone { position:fixed; inset:0; pointer-events:none; opacity:.33;
+    background-image: radial-gradient(rgba(26,18,38,.9) 1px, transparent 1.5px); background-size: 6px 6px;
+    -webkit-mask-image: radial-gradient(ellipse at center, transparent 58%, #000 100%); mask-image: radial-gradient(ellipse at center, transparent 58%, #000 100%); }
+  #vignette { position:fixed; inset:0; pointer-events:none; box-shadow: inset 0 0 0 6px var(--ink), inset 0 0 120px rgba(20,8,40,.45); }
+  .comic { font-family:'Bangers', Impact, 'Arial Black', sans-serif; letter-spacing:1px; }
+  .panel { background:var(--paper); border:3px solid var(--ink); border-radius:12px; box-shadow:4px 4px 0 var(--ink); }
+  #title { position:fixed; left:18px; top:12px; pointer-events:none; }
+  #title h1 { margin:0; font-family:'Bangers',Impact,sans-serif; font-size:44px; line-height:1; color:var(--yellow);
+    -webkit-text-stroke:2px var(--ink); text-shadow:3px 3px 0 var(--orange), 6px 6px 0 var(--ink); letter-spacing:2px; transform:rotate(-2deg); }
+  #title .sub { margin:6px 0 0 4px; font-family:'Bangers',Impact,sans-serif; font-size:16px; color:#fff; -webkit-text-stroke:1px var(--ink); text-shadow:2px 2px 0 var(--ink); letter-spacing:1px; }
+  #modes { position:fixed; left:18px; top:92px; display:flex; gap:8px; }
+  button.cb { font-family:'Bangers',Impact,sans-serif; font-size:18px; letter-spacing:1px; padding:6px 12px; border:3px solid var(--ink); border-radius:10px;
+    background:#fff; box-shadow:3px 3px 0 var(--ink); cursor:pointer; color:var(--ink); transition:transform .08s; }
+  button.cb:hover { transform:translate(-1px,-1px); box-shadow:4px 4px 0 var(--ink); background:#fff6d6; }
+  button.cb:active { transform:translate(2px,2px); box-shadow:1px 1px 0 var(--ink); }
+  button.cb.on { background:var(--orange); color:#fff; text-shadow:2px 2px 0 var(--ink); }
+  #tour { position:fixed; left:18px; top:140px; display:flex; flex-direction:column; gap:6px; max-height:calc(100vh - 440px); overflow:auto; padding:2px 8px 8px 2px; }
+  #tour .hdr { font-family:'Bangers'; color:#fff; -webkit-text-stroke:1px var(--ink); text-shadow:2px 2px 0 var(--ink); font-size:17px; }
+  #tour button { font-size:14px; padding:3px 9px; text-align:left; }
+  #tour .hdr.tg { cursor:pointer; user-select:none; }
+  #tour.min > button, #tour.min > .hdr:not(.tg) { display:none; }
+  #help { position:fixed; left:18px; bottom:16px; padding:10px 14px; font-size:13px; line-height:1.5; max-width:340px; }
+  #help h3 { margin:0 0 4px; font-family:'Bangers'; font-size:20px; letter-spacing:1px; color:var(--blue); }
+  #help .k { display:inline-block; min-width:20px; padding:0 5px; border:2px solid var(--ink); border-radius:5px; background:#ffe9a8; font-family:ui-monospace,monospace; font-size:11px; font-weight:bold; text-align:center; margin-right:2px; line-height:16px; }
+  #help .row { white-space:nowrap; }
+  #help.min .body { display:none; }
+  #balls { position:fixed; right:16px; top:14px; padding:7px 10px; display:flex; gap:5px; align-items:center; }
+  #balls .t { font-family:'Bangers'; font-size:16px; margin-right:4px; }
+  #balls .db { width:26px; height:26px; border-radius:50%; border:2px solid var(--ink); opacity:.28; position:relative;
+    background: radial-gradient(circle at 33% 28%, #fff7cf 0 10%, #ffc43a 28%, #ff8a00 68%, #c95200); display:flex; align-items:center; justify-content:center;
+    color:#d10000; font-size:10px; line-height:7px; text-align:center; font-weight:bold; }
+  #balls .db.got { opacity:1; box-shadow:0 0 12px #ffb400; animation: dbpulse 1.2s ease-in-out infinite; }
+  @keyframes dbpulse { 50% { box-shadow:0 0 22px #ffd000; } }
+  #radar { position:fixed; right:16px; top:62px; width:180px; height:180px; display:none; filter: drop-shadow(4px 4px 0 var(--ink)); }
+  #power { position:fixed; right:16px; bottom:16px; padding:8px 14px; text-align:right; display:none; }
+  #power .lv { font-family:'Bangers'; font-size:28px; color:var(--orange); -webkit-text-stroke:1px var(--ink); line-height:1; }
+  #power .fm { font-family:'Bangers'; font-size:16px; letter-spacing:1px; }
+  #labels, #pops { position:fixed; inset:0; pointer-events:none; overflow:hidden; }
+  .lbl { position:absolute; left:0; top:0; white-space:nowrap; font-family:'Bangers',Impact,sans-serif; font-size:15px; color:#fff; letter-spacing:1px;
+    -webkit-text-stroke:.6px var(--ink); text-shadow:2px 2px 0 var(--ink); padding:1px 8px; background:rgba(255,138,0,.95); border:2px solid var(--ink); border-radius:9px; will-change:transform; display:none; }
+  .lbl::after { content:''; position:absolute; left:50%; bottom:-9px; margin-left:-6px; border:6px solid transparent; border-top-color:var(--ink); border-bottom:0; }
+  .lbl.place { background:rgba(29,95,209,.95); font-size:19px; padding:2px 10px; }
+  .lbl.veh { background:rgba(38,166,154,.95); font-size:13px; }
+  .lbl.dino { background:rgba(76,175,80,.95); }
+  .lbl.ball { background:rgba(255,196,0,.97); color:#c40000; text-shadow:none; -webkit-text-stroke:0; }
+  .pop { position:absolute; font-family:'Bangers',Impact,sans-serif; color:var(--yellow); -webkit-text-stroke:2px var(--ink); text-shadow:4px 4px 0 var(--ink);
+    font-size:54px; transform:translate(-50%,-50%) scale(.2) rotate(-8deg); animation: popA 1.2s ease-out forwards; white-space:nowrap; letter-spacing:2px; }
+  .pop.blue { color:#8fe3ff; } .pop.red { color:#ff5a3c; } .pop.small { font-size:34px; }
+  @keyframes popA { 0%{transform:translate(-50%,-50%) scale(.2) rotate(-8deg);opacity:0} 14%{transform:translate(-50%,-50%) scale(1.18) rotate(-4deg);opacity:1}
+    28%{transform:translate(-50%,-50%) scale(1) rotate(-6deg)} 78%{opacity:1} 100%{transform:translate(-50%,-68%) scale(1.04) rotate(-6deg);opacity:0} }
+  #bubble { position:fixed; left:50%; top:12%; transform:translateX(-50%); max-width:620px; padding:14px 22px; font-family:'Bangers'; font-size:25px; letter-spacing:1px; text-align:center; display:none; border-radius:40px; }
+  #bubble .who { color:#1f8a3a; font-size:18px; }
+  #bubble .wishes { display:flex; gap:10px; justify-content:center; margin-top:12px; flex-wrap:wrap; }
+  #banner { position:fixed; left:50%; top:14px; transform:translateX(-50%); padding:6px 16px; font-family:'Bangers'; font-size:20px; letter-spacing:1px; display:none; }
+  #flash { position:fixed; inset:0; background:#fff; opacity:0; pointer-events:none; }
+  #loading { position:fixed; inset:0; display:flex; flex-direction:column; gap:22px; align-items:center; justify-content:center; z-index:50;
+    background: radial-gradient(circle, #ffc23a, #ff7a00 55%, #6e1a00); font-family:'Bangers',Impact,sans-serif; font-size:44px; color:#fff; -webkit-text-stroke:2px var(--ink); text-shadow:4px 4px 0 var(--ink); letter-spacing:2px; }
+  #loading .ball { width:130px; height:130px; border-radius:50%; border:4px solid var(--ink); box-shadow:6px 6px 0 var(--ink);
+    background: radial-gradient(circle at 33% 28%, #fff7cf 0 10%, #ffc43a 28%, #ff8a00 68%, #c95200); animation: spin 1.4s linear infinite; display:flex; align-items:center; justify-content:center; color:#d10000; font-size:38px; -webkit-text-stroke:0; text-shadow:none; }
+  #loading .small { font-size:18px; -webkit-text-stroke:0; text-shadow:2px 2px 0 var(--ink); }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (max-width: 760px), (max-height: 560px) {
+    #title h1 { font-size:30px; } #title .sub { display:none; }
+    #modes { top:52px; } button.cb { font-size:15px; padding:4px 9px; }
+    #tour { top:96px; } #tour button { font-size:12px; padding:2px 7px; }
+    #help { font-size:11px; max-width:calc(100vw - 36px); padding:6px 10px; } #help h3 { font-size:16px; }
+    #balls { top:10px; right:10px; padding:5px 7px; gap:3px; } #balls .t { display:none; } #balls .db { width:19px; height:19px; font-size:7px; line-height:5px; }
+    #radar { width:124px; height:124px; top:44px; right:10px; }
+    #power { right:10px; bottom:10px; padding:5px 10px; } #power .lv { font-size:20px; }
+    #bubble { font-size:18px; max-width:92vw; padding:10px 14px; } .pop { font-size:38px; } .pop.small { font-size:26px; }
+  }
+  #err { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); padding:18px 24px; display:none; z-index:60; max-width:600px; font-size:15px; white-space:pre-wrap; word-break:break-word; max-height:80vh; overflow:auto; }
+</style>
+<script type="importmap">
+{ "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<canvas id="gl" tabindex="0"></canvas>
+<canvas id="speed"></canvas>
+<div id="halftone"></div>
+<div id="vignette"></div>
+<div id="labels"></div>
+<div id="pops"></div>
+<div id="title"><h1>DRAGON BALL PLANET</h1><div class="sub">A tiny cartoon world · find the 7 Dragon Balls!</div></div>
+<div id="modes">
+  <button class="cb on" id="bOrbit" title="Orbit camera (G)">🌍 Orbit</button>
+  <button class="cb" id="bFly" title="Fly with Goku (G)">☁️ Fly with Goku</button>
+</div>
+<div id="tour"></div>
+<div id="help" class="panel">
+  <h3>HOW TO PLAY <span style="float:right;cursor:pointer;pointer-events:auto" id="helpToggle">[H]</span></h3>
+  <div class="body" id="helpBody"></div>
+</div>
+<div id="balls" class="panel"><span class="t">DRAGON BALLS</span></div>
+<canvas id="radar" width="360" height="360"></canvas>
+<div id="power" class="panel"><div class="fm" id="pForm">BASE FORM</div><div class="lv" id="pLevel">POWER 9,001</div></div>
+<div id="banner" class="panel"></div>
+<div id="bubble" class="panel"></div>
+<div id="flash"></div>
+<div id="err" class="panel"></div>
+<div id="loading"><div class="ball">★★★★</div><div id="loadMsg">GATHERING THE DRAGON BALLS…</div><div class="small" id="loadSub">building the planet</div></div>
+<script>
+  // classic-script safety net: module load/runtime failures (no WebGL, CDN blocked...) become a readable panel
+  window.__dbErr = function (msg) {
+    var e = document.getElementById('err'); if (!e || e.dataset.shown) return; e.dataset.shown = '1';
+    e.innerHTML = '<b style="font-family:Bangers;font-size:26px;color:#d10000">OOPS! THE PLANET EXPLODED…</b><br><br>' + String(msg).replace(/</g, '&lt;') +
+      '<br><br><small>Needs a WebGL-capable browser and internet access (Three.js loads from a CDN).' + (window.__dbAlive ? ' Click this card to close it.' : '') + '</small>';
+    e.style.display = 'block'; var l = document.getElementById('loading'); if (l) l.style.display = 'none';
+  };
+  // only report errors raised by this page or by three.js, never ones from browser extensions / host scripts
+  var __dbPage = location.href.split(/[?#]/)[0];
+  function __dbOurs(s) { s = String(s || ''); return s.indexOf(__dbPage) >= 0 || s.indexOf('cdn.jsdelivr.net/npm/three') >= 0; }
+  window.addEventListener('error', function (ev) {
+    if (!__dbOurs(ev.filename) && !(ev.error && __dbOurs(ev.error.stack))) { console.warn('[ignored foreign error]', ev.message); return; }
+    var m = (ev.error && ev.error.message) || ev.message || 'Unknown error', st = ev.error && ev.error.stack ? String(ev.error.stack) : '';
+    window.__dbErr(st && st.indexOf(m) < 0 ? m + '\n' + st : st || m);
+  });
+  window.addEventListener('unhandledrejection', function (ev) {
+    var r = ev.reason; if (!(r && __dbOurs(r.stack))) { console.warn('[ignored foreign rejection]', r); return; }
+    window.__dbErr(String(r.stack).indexOf(r.message) < 0 ? r.message + '\n' + r.stack : r.stack);
+  });
+  document.getElementById('err').addEventListener('click', function () { if (window.__dbAlive) this.style.display = 'none'; });
+  setTimeout(function () { if (!window.__dbAlive) { window.__dbErr('Three.js could not be loaded (module did not start).'); var e = document.getElementById('err'); if (e) e.dataset.late = '1'; } }, 30000);
+</script>
+<script type="module">
